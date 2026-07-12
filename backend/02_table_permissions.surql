@@ -12,12 +12,6 @@ DEFINE TABLE OVERWRITE badge SCHEMAFULL PERMISSIONS
     FOR update WHERE 'badge_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
     FOR delete WHERE 'badge_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
 
-DEFINE TABLE OVERWRITE reward SCHEMAFULL PERMISSIONS
-    FOR select WHERE 'reward_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)
-    FOR create WHERE 'reward_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
-    FOR update WHERE 'reward_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
-    FOR delete WHERE 'reward_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
-
 DEFINE TABLE OVERWRITE challenge SCHEMAFULL PERMISSIONS
     FOR select WHERE 'challenge_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)
     FOR create WHERE 'challenge_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
@@ -65,6 +59,24 @@ DEFINE TABLE OVERWRITE environmental_goal SCHEMAFULL PERMISSIONS
     FOR create WHERE 'environmental_goal_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
     FOR update WHERE 'environmental_goal_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
     FOR delete WHERE 'environmental_goal_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
+
+DEFINE TABLE OVERWRITE reward SCHEMAFULL PERMISSIONS
+    FOR select WHERE 'reward_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)
+    FOR create WHERE 'reward_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR update WHERE 'reward_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR delete WHERE 'reward_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
+
+DEFINE TABLE OVERWRITE user SCHEMAFULL PERMISSIONS
+    FOR select WHERE 'user_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)
+    FOR create WHERE 'user_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR update WHERE 'user_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR delete WHERE 'user_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
+
+DEFINE TABLE OVERWRITE groups SCHEMAFULL PERMISSIONS
+    FOR select WHERE 'groups_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)
+    FOR create WHERE 'groups_create' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR update WHERE 'groups_update' IN $auth.permissions AND (owned_by IN $auth.parents OR owned_by IN $auth.dominates)
+    FOR delete WHERE 'groups_delete' IN $auth.permissions AND (owned_by IN $auth.dominates);
 
 DEFINE TABLE OVERWRITE esg_tx SCHEMAFULL PERMISSIONS
     FOR select WHERE 'esg_tx_select' IN $auth.permissions AND (readers CONTAINSANY $auth.parents OR readers CONTAINSANY $auth.dominates)

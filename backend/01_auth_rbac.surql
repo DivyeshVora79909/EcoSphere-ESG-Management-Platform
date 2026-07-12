@@ -281,7 +281,6 @@ CREATE groups:root SET name = 'System Admins', role = [
     'link_create', 'link_select', 'link_delete',
     'category_select', 'category_create', 'category_update', 'category_delete',
     'badge_select', 'badge_create', 'badge_update', 'badge_delete',
-    'reward_select', 'reward_create', 'reward_update', 'reward_delete',
     'challenge_select', 'challenge_create', 'challenge_update', 'challenge_delete',
     'csr_activity_select', 'csr_activity_create', 'csr_activity_update', 'csr_activity_delete',
     'esg_policy_select', 'esg_policy_create', 'esg_policy_update', 'esg_policy_delete',
@@ -290,6 +289,9 @@ CREATE groups:root SET name = 'System Admins', role = [
     'emission_factor_select', 'emission_factor_create', 'emission_factor_update', 'emission_factor_delete',
     'product_esg_profile_select', 'product_esg_profile_create', 'product_esg_profile_update', 'product_esg_profile_delete',
     'environmental_goal_select', 'environmental_goal_create', 'environmental_goal_update', 'environmental_goal_delete',
+    'reward_select', 'reward_create', 'reward_update', 'reward_delete',
+    'user_select', 'user_create', 'user_update', 'user_delete',
+    'groups_select', 'groups_create', 'groups_update', 'groups_delete',
     'esg_tx_select', 'esg_tx_create', 'esg_tx_update', 'esg_tx_delete'
 ];
 

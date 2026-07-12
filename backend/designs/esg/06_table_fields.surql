@@ -15,39 +15,67 @@ DEFINE FIELD a_name ON badge TYPE string;
 DEFINE FIELD a_required_xp ON badge TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON badge TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON badge TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON badge TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'badge' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE challenge SCHEMAFULL;
 DEFINE FIELD a_name ON challenge TYPE string;
 DEFINE FIELD a_xp_reward ON challenge TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON challenge TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON challenge TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON challenge TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'challenge' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE csr_activity SCHEMAFULL;
 DEFINE FIELD a_name ON csr_activity TYPE string;
 DEFINE FIELD a_xp_reward ON csr_activity TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON csr_activity TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON csr_activity TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON csr_activity TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'csr_activity' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE esg_policy SCHEMAFULL;
 DEFINE FIELD a_name ON esg_policy TYPE string;
 DEFINE FIELD a_status ON esg_policy TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON esg_policy TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON esg_policy TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'esg_policy' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE audit SCHEMAFULL;
 DEFINE FIELD a_name ON audit TYPE string;
 DEFINE FIELD a_status ON audit TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON audit TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON audit TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'audit' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE product SCHEMAFULL;
 DEFINE FIELD a_name ON product TYPE string;
 DEFINE FIELD a_status ON product TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON product TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON product TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'product' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE emission_factor SCHEMAFULL;
 DEFINE FIELD a_name ON emission_factor TYPE string;
 DEFINE FIELD a_co2e_per_unit ON emission_factor TYPE decimal ASSERT $value >= 0dec;
 DEFINE FIELD a_status ON emission_factor TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON emission_factor TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON emission_factor TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'emission_factor' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 
 -- ==============================================================================
@@ -59,11 +87,19 @@ DEFINE FIELD a_emission_factor ON product_esg_profile TYPE record<emission_facto
 DEFINE FIELD a_xp_penalty_per_unit ON product_esg_profile TYPE decimal DEFAULT 0dec ASSERT $value >= 0dec;
 DEFINE FIELD a_status ON product_esg_profile TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON product_esg_profile TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON product_esg_profile TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'product_esg_profile' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 DEFINE TABLE environmental_goal SCHEMAFULL;
 DEFINE FIELD a_target_co2e ON environmental_goal TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON environmental_goal TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON environmental_goal TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+DEFINE FIELD e_guard ON environmental_goal TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'environmental_goal' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 -- Reward Engine (Self-Resolving Inventory)
 DEFINE TABLE reward SCHEMAFULL;
@@ -72,8 +108,11 @@ DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_total_stock ON reward TYPE decimal ASSERT $value >= 0dec AND math::floor($value) = $value;
 DEFINE FIELD a_status ON reward TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON reward TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
-
 DEFINE FIELD d1_remaining_stock ON reward TYPE decimal VALUE $this.a_total_stock - ((type::record('v_tx_to', [$this.id, -1])).total_qty ?? 0dec);
+DEFINE FIELD e_guard ON reward TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'reward' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
 
 -- ==============================================================================
@@ -118,6 +157,9 @@ DEFINE FIELD d5_raw_co2e ON esg_tx TYPE decimal VALUE ($this.a_qty * $this.a_co2
 
 -- Internal Matrix Guard
 DEFINE FIELD e_guard ON esg_tx TYPE bool VALUE {
+    -- 0. Taxonomy Constraint
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'esg_tx' { THROW "TAXONOMY_ERR: Category mismatch."; };
+
     -- 1. Discrete Physical Constraint
     IF $this.d1_target_tb = 'reward' AND math::floor($this.a_qty) != $this.a_qty {
         THROW "PHYSICS_ERR: Redemptions must use exact integer quantities.";
