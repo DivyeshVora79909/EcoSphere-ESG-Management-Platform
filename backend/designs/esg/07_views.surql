@@ -1,55 +1,99 @@
 -- ==============================================================================
--- FILE 07: O(1) AGGREGATIONS & BI VIEWS
+-- FILE 07: O(1) AGGREGATIONS & BI VIEWS (THE OLAP CUBE)
 -- ==============================================================================
 USE NS main DB main;
 
 -- ==============================================================================
--- 1. CARBON ACCOUNTING (Environment)
+-- 1. TRANSACTION MATRIX (Grouped by Relation, Status, Category)
 -- ==============================================================================
-DEFINE TABLE OVERWRITE v_carbon_dept AS SELECT a_department AS department, count() AS tx_count, math::sum(d1_total_co2e) AS total_co2e FROM carbon_transaction GROUP BY department;
 
-DEFINE TABLE OVERWRITE v_carbon_factor AS SELECT a_emission_factor AS factor, math::sum(a_qty) AS total_qty, math::sum(d1_total_co2e) AS total_co2e FROM carbon_transaction GROUP BY factor;
-
--- ==============================================================================
--- 2. GAMIFICATION LEDGER & WALLETS (Social)
--- ==============================================================================
-DEFINE TABLE OVERWRITE v_emp_csr AS SELECT a_employee AS employee, count() AS total_activities, math::sum(d1_points_earned) AS total_csr_points FROM csr_participation GROUP BY employee;
-
-DEFINE TABLE OVERWRITE v_emp_challenge AS SELECT a_employee AS employee, math::sum(d2_is_completed) AS completed_challenges, math::sum(d1_xp_earned) AS total_challenge_xp FROM challenge_participation GROUP BY employee;
-
-DEFINE TABLE OVERWRITE v_emp_redemptions AS SELECT a_employee AS employee, math::sum(a_qty) AS items_redeemed, math::sum(d1_total_cost) AS total_spent FROM reward_redemption GROUP BY employee;
-
--- The Master Employee Wallet
-DEFINE TABLE OVERWRITE v_employee_wallet AS 
+-- FROM perspective: What did the User do?
+DEFINE TABLE OVERWRITE v_tx_from_ctx AS 
     SELECT 
-        a_employee AS employee,
-        math::sum(d1_points_earned) AS total_earned,
-        math::sum(d1_points_earned) - ((type::record('v_emp_redemptions', [$this.a_employee.id])).total_spent ?? 0dec) AS available_balance
-    FROM csr_participation 
-    GROUP BY employee;
+        a_from AS user, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(a_qty) AS total_qty, 
+        math::sum(d2_xp_earned) AS xp_earned, 
+        math::sum(d3_xp_spent) AS xp_spent, 
+        math::sum(d4_net_xp) AS net_xp, 
+        math::sum(d5_co2e) AS co2e 
+    FROM esg_tx 
+    GROUP BY user, status, category;
 
--- ==============================================================================
--- 3. REWARD INVENTORY (Matrix State)
--- ==============================================================================
-DEFINE TABLE OVERWRITE v_reward_redemptions AS SELECT a_reward AS reward, math::sum(a_qty) AS redeemed_qty FROM reward_redemption GROUP BY reward;
-
-DEFINE TABLE OVERWRITE v_reward_stock AS 
+-- TO perspective: How did the Anchor perform? (E.g., How many approvals did Challenge X get?)
+DEFINE TABLE OVERWRITE v_tx_to_ctx AS 
     SELECT 
-        id AS reward, 
-        a_initial_stock, 
-        a_initial_stock - ((type::record('v_reward_redemptions', [$this.id])).redeemed_qty ?? 0) AS remaining_stock 
-    FROM reward;
+        a_to AS target, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(a_qty) AS total_qty, 
+        math::sum(d2_xp_earned) AS xp_minted, 
+        math::sum(d3_xp_spent) AS xp_consumed, 
+        math::sum(d5_co2e) AS co2e_generated 
+    FROM esg_tx 
+    GROUP BY target, status, category;
+
 
 -- ==============================================================================
--- 4. GOVERNANCE & COMPLIANCE METRICS
+-- 2. MATHEMATICAL ABSOLUTES (Strict 'Approved' States for Guardrails)
 -- ==============================================================================
-DEFINE TABLE OVERWRITE v_compliance_dept AS SELECT a_audit.a_department AS department, count() AS total_issues, math::sum(d2_is_open) AS open_issues, math::sum(d1_is_overdue) AS overdue_issues FROM compliance_issue GROUP BY department;
 
-DEFINE TABLE OVERWRITE v_policy_ack_dept AS SELECT a_employee.a_department AS department, count() AS total_acknowledgements FROM policy_acknowledgement GROUP BY department;
+-- The absolute Wallet Balance (Only counts finalized/approved math)
+DEFINE TABLE OVERWRITE v_user_wallet AS 
+    SELECT 
+        a_from AS user, 
+        math::sum(d4_net_xp) AS balance, 
+        math::sum(d5_co2e) AS lifetime_co2e 
+    FROM esg_tx 
+    WHERE a_status = 'Approved' 
+    GROUP BY user;
+
+-- The absolute Reward Inventory consumed
+DEFINE TABLE OVERWRITE v_reward_consumption AS 
+    SELECT 
+        a_to AS reward, 
+        math::sum(a_qty) AS total_consumed 
+    FROM esg_tx 
+    WHERE record::tb(a_to) = 'reward' AND a_status = 'Approved' 
+    GROUP BY reward;
+
 
 -- ==============================================================================
--- 5. TIME-SERIES BI (Read-Only Dashboards)
+-- 3. THE BADGE PHANTOM (100% Derived View)
 -- ==============================================================================
-DEFINE TABLE OVERWRITE v_bi_carbon_monthly AS SELECT time::group(created_at, 'month') AS month, a_department AS department, math::sum(d1_total_co2e) AS monthly_co2e FROM carbon_transaction GROUP BY month, department;
+-- This uses SurrealDB subqueries to instantly map users to the badges they mathematically qualify for.
 
-DEFINE TABLE OVERWRITE v_bi_participation_monthly AS SELECT time::group(created_at, 'month') AS month, a_employee.a_department AS department, math::sum(d1_points_earned) AS monthly_points FROM csr_participation GROUP BY month, department;
+DEFINE TABLE OVERWRITE v_user_badges AS 
+    SELECT 
+        user, 
+        balance AS current_xp,
+        (SELECT id, a_name FROM badge WHERE a_required_xp <= $parent.balance AND a_status = 'Active') AS unlocked_badges 
+    FROM v_user_wallet;
+
+
+-- ==============================================================================
+-- 4. DEPARTMENTAL ROLLUPS (Grouping by the natively derived RBAC 'owned_by')
+-- ==============================================================================
+-- By checking a_from.owned_by, we effortlessly roll up users into their Groups (Departments).
+
+DEFINE TABLE OVERWRITE v_group_esg_ctx AS 
+    SELECT 
+        a_from.owned_by AS group, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(d2_xp_earned) AS xp_earned, 
+        math::sum(d3_xp_spent) AS xp_spent, 
+        math::sum(d4_net_xp) AS net_xp, 
+        math::sum(d5_co2e) AS co2e 
+    FROM esg_tx 
+    GROUP BY group, status, category;
+
+DEFINE TABLE OVERWRITE v_group_wallet AS 
+    SELECT 
+        a_from.owned_by AS group, 
+        math::sum(d4_net_xp) AS total_balance, 
+        math::sum(d5_co2e) AS total_co2e 
+    FROM esg_tx 
+    WHERE a_status = 'Approved' 
+    GROUP BY group;

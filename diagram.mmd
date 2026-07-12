@@ -1,46 +1,104 @@
 flowchart TD
-    classDef system fill:#636e72,stroke:#b2bec3,stroke-width:2px,color:#fff;
-    classDef anchor fill:#2d3436,stroke:#dfe6e9,stroke-width:2px,color:#fff;
-    classDef branch fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
-    classDef leaf fill:#fdcb6e,stroke:#ffeaa7,stroke-width:2px,color:#2d3436;
-    classDef tag fill:#e84393,stroke:#fd79a8,stroke-width:2px,color:#fff;
 
-    subgraph SYS [System Ecosystem]
-        USER((user)):::system
-        GROUPS((groups)):::system
-    end
+%% =====================================================
+%% Styles
+%% =====================================================
 
-    subgraph L0 [Level 0: Independent Anchors]
-        CATEGORY((category)):::tag
-        PRODUCT((product)):::anchor
-        EMISSION((emission_factor)):::anchor
-        POLICY((esg_policy)):::anchor
-        REWARD((reward)):::anchor
-        CHALLENGE((challenge)):::anchor
-        AUDIT((audit)):::anchor
-        CSR((csr_activity)):::anchor
-        BADGE((badge)):::anchor
-    end
+classDef system fill:#636e72,stroke:#b2bec3,stroke-width:2px,color:#fff;
+classDef anchor fill:#2d3436,stroke:#dfe6e9,stroke-width:2px,color:#fff;
+classDef branch fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
+classDef ledger fill:#fdcb6e,stroke:#ffeaa7,stroke-width:2px,color:#2d3436;
+classDef taxonomy fill:#e84393,stroke:#fd79a8,stroke-width:2px,color:#fff;
 
-    subgraph L1 [Level 1: Contextual Branches]
-        PROFILE[product_esg_profile]:::branch
-        GOAL[environmental_goal]:::branch
-    end
+%% =====================================================
+%% External Actors
+%% =====================================================
 
-    subgraph L2 [Level 2: The Universal Ledger Leaf]
-        TX[esg_transaction]:::leaf
-    end
+subgraph ECOSYSTEM["System Ecosystem"]
+    USER((User)):::system
+    GROUP((Group)):::system
+end
 
-    %% Level 1 Structural Edges
-    PROFILE -- "a_product / a_emission" --> PRODUCT & EMISSION
-    GOAL -- "a_group" --> GROUPS
-    
-    %% The Absolute Graph Engine (Polymorphic Double-Entry)
-    TX -- "a_from / a_to" --> USER & GROUPS
-    TX -- "a_from / a_to" --> PROFILE & CSR & CHALLENGE & POLICY & REWARD & AUDIT
+%% =====================================================
+%% Level 0
+%% =====================================================
 
-    %% Universal State Classification
-    CATEGORY -. "a_category Classification Engine" .-> TX & PROFILE & GOAL & L0
+subgraph L0["Level 0 • Independent Anchors"]
 
-    %% Frontend Derived Logic (No math connections)
-    BADGE -. "Derived in Views" .- USER
+    PRODUCT((Product)):::anchor
+    EMISSION((Emission Factor)):::anchor
+    POLICY((ESG Policy)):::anchor
+    REWARD((Reward)):::anchor
+    CHALLENGE((Challenge)):::anchor
+    AUDIT((Audit)):::anchor
+    CSR((CSR Activity)):::anchor
+
+    CATEGORY((Category)):::taxonomy
+end
+
+%% =====================================================
+%% Level 1
+%% =====================================================
+
+subgraph L1["Level 1 • Contextual Branches"]
+
+    PROFILE["Product ESG Profile"]:::branch
+    GOAL["Environmental Goal"]:::branch
+
+end
+
+%% =====================================================
+%% Level 2
+%% =====================================================
+
+subgraph L2["Level 2 • Universal ESG Ledger"]
+
+    TX["ESG Transaction"]:::ledger
+
+end
+
+%% =====================================================
+%% Structural Relationships
+%% =====================================================
+
+PROFILE -->|a_product| PRODUCT
+PROFILE -->|a_emission| EMISSION
+
+GOAL -->|a_group| GROUP
+
+%% =====================================================
+%% Universal Ledger Connections
+%% =====================================================
+
+TX -->|a_from / a_to| USER
+TX -->|a_from / a_to| GROUP
+
+TX -->|a_from / a_to| PROFILE
+TX -->|a_from / a_to| CSR
+TX -->|a_from / a_to| POLICY
+TX -->|a_from / a_to| CHALLENGE
+TX -->|a_from / a_to| REWARD
+TX -->|a_from / a_to| AUDIT
+
+%% =====================================================
+%% Classification Layer
+%% =====================================================
+
+CATEGORY -.-> PRODUCT
+CATEGORY -.-> EMISSION
+CATEGORY -.-> PROFILE
+CATEGORY -.-> GOAL
+CATEGORY -.-> POLICY
+CATEGORY -.-> REWARD
+CATEGORY -.-> CHALLENGE
+CATEGORY -.-> CSR
+CATEGORY -.-> AUDIT
+CATEGORY -.-> TX
+
+%% =====================================================
+%% Derived Objects
+%% =====================================================
+
+BADGE["Badge (Derived View)"]:::branch
+
+BADGE -.-> USER

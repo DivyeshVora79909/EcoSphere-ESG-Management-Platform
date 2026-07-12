@@ -1,163 +1,171 @@
 -- ==============================================================================
--- FILE 06: TABLE FIELDS (ESG ONTOLOGY & DAG STRUCTURE)
+-- FILE 06: TABLE FIELDS (UNIVERSAL ESG LEDGER & DAG)
 -- ==============================================================================
 USE NS main DB main;
 
 -- ==============================================================================
--- LEVEL 0: THE ROOT
+-- LEVEL 0: TAXONOMY & INDEPENDENT ANCHORS
 -- ==============================================================================
 
-DEFINE TABLE org SCHEMAFULL;
-DEFINE FIELD a_name ON org TYPE string;
+-- 1. Taxonomy Engine (The Universal Classifier)
+DEFINE TABLE category SCHEMAFULL;
+DEFINE FIELD a_name ON category TYPE string;
+DEFINE FIELD a_target_table ON category TYPE string; 
+-- ^ Determines which table this category is allowed to classify (e.g., 'esg_tx', 'reward', 'challenge')
 
-
--- ==============================================================================
--- LEVEL 1: ORGANIZATION CONFIGURATION (Nouns & Laws)
--- ==============================================================================
-
-DEFINE TABLE department SCHEMAFULL;
-DEFINE FIELD a_org ON department TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON department TYPE string;
-
-DEFINE TABLE esg_category SCHEMAFULL;
-DEFINE FIELD a_org ON esg_category TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON esg_category TYPE string;
-DEFINE FIELD a_type ON esg_category TYPE string ASSERT $value IN ['CSR', 'Challenge'];
-
-DEFINE TABLE product SCHEMAFULL;
-DEFINE FIELD a_org ON product TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON product TYPE string;
-
-DEFINE TABLE emission_factor SCHEMAFULL;
-DEFINE FIELD a_org ON emission_factor TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON emission_factor TYPE string;
-DEFINE FIELD a_co2e_per_unit ON emission_factor TYPE decimal ASSERT $value >= 0dec;
-
-DEFINE TABLE environmental_goal SCHEMAFULL;
-DEFINE FIELD a_org ON environmental_goal TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON environmental_goal TYPE string;
-DEFINE FIELD a_target_co2e ON environmental_goal TYPE decimal ASSERT $value > 0dec;
-
-DEFINE TABLE esg_policy SCHEMAFULL;
-DEFINE FIELD a_org ON esg_policy TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON esg_policy TYPE string;
-
+-- 2. Master Anchors
 DEFINE TABLE badge SCHEMAFULL;
-DEFINE FIELD a_org ON badge TYPE record<org> REFERENCE ON DELETE CASCADE;
 DEFINE FIELD a_name ON badge TYPE string;
 DEFINE FIELD a_required_xp ON badge TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_status ON badge TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON badge TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
 
-DEFINE TABLE reward SCHEMAFULL;
-DEFINE FIELD a_org ON reward TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON reward TYPE string;
-DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
-DEFINE FIELD a_initial_stock ON reward TYPE int ASSERT $value >= 0;
-
-DEFINE TABLE audit SCHEMAFULL;
-DEFINE FIELD a_org ON audit TYPE record<org> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_department ON audit TYPE record<department> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_name ON audit TYPE string;
-
-
--- ==============================================================================
--- LEVEL 2: CONTEXTS & ACTORS (Edges connecting the Nouns)
--- ==============================================================================
-
-DEFINE TABLE employee SCHEMAFULL;
-DEFINE FIELD a_department ON employee TYPE record<department> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_name ON employee TYPE string;
-
-DEFINE TABLE product_esg_profile SCHEMAFULL;
-DEFINE FIELD a_product ON product_esg_profile TYPE record<product> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_emission_factor ON product_esg_profile TYPE record<emission_factor> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_xp_penalty_per_unit ON product_esg_profile TYPE decimal DEFAULT 0dec ASSERT $value >= 0dec; 
--- ^ Determines how much XP is deducted per unit of carbon emitted.
-
-DEFINE TABLE csr_activity SCHEMAFULL;
-DEFINE FIELD a_category ON csr_activity TYPE record<esg_category> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_name ON csr_activity TYPE string;
-DEFINE FIELD a_xp_reward ON csr_activity TYPE decimal ASSERT $value > 0dec;
-
-DEFINE TABLE challenge SCHEMAFULL;
-DEFINE FIELD a_category ON challenge TYPE record<esg_category> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_name ON challenge TYPE string;
-DEFINE FIELD a_xp_reward ON challenge TYPE decimal ASSERT $value > 0dec;
-
-
--- ==============================================================================
--- LEVEL 3: VERBS & LEDGER (The Immutable Mathematical Graph)
--- ==============================================================================
-
--- 1. CARBON: Drains XP based on emissions (Polymorphic Actor)
-DEFINE TABLE carbon_transaction SCHEMAFULL;
-DEFINE FIELD a_actor ON carbon_transaction TYPE record<department | employee> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_profile ON carbon_transaction TYPE record<product_esg_profile> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_qty ON carbon_transaction TYPE decimal ASSERT $value > 0dec;
-
-DEFINE FIELD d1_co2e ON carbon_transaction TYPE decimal VALUE ($this.a_qty * $this.a_profile.a_emission_factor.a_co2e_per_unit);
-DEFINE FIELD d2_xp_penalty ON carbon_transaction TYPE decimal VALUE ($this.a_qty * $this.a_profile.a_xp_penalty_per_unit);
-
-DEFINE FIELD d3_actor_type ON carbon_transaction TYPE string VALUE record::tb($this.a_actor);
-
-
--- 2. CSR: Mints XP for participating
-DEFINE TABLE csr_participation SCHEMAFULL;
-DEFINE FIELD a_employee ON csr_participation TYPE record<employee> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_csr_activity ON csr_participation TYPE record<csr_activity> REFERENCE ON DELETE REJECT;
-
-DEFINE FIELD d1_xp_earned ON csr_participation TYPE decimal VALUE $this.a_csr_activity.a_xp_reward;
-
-
--- 3. CHALLENGE: Mints XP for completing
-DEFINE TABLE challenge_participation SCHEMAFULL;
-DEFINE FIELD a_employee ON challenge_participation TYPE record<employee> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_challenge ON challenge_participation TYPE record<challenge> REFERENCE ON DELETE REJECT;
-
-DEFINE FIELD d1_xp_earned ON challenge_participation TYPE decimal VALUE $this.a_challenge.a_xp_reward;
-
-
--- 4. GOVERNANCE: Acknowledging laws
-DEFINE TABLE policy_ack SCHEMAFULL;
-DEFINE FIELD a_employee ON policy_ack TYPE record<employee> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_policy ON policy_ack TYPE record<esg_policy> REFERENCE ON DELETE REJECT;
-
-
--- 5. GOVERNANCE: Breaking laws
-DEFINE TABLE compliance_issue SCHEMAFULL;
-DEFINE FIELD a_audit ON compliance_issue TYPE record<audit> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_employee ON compliance_issue TYPE record<employee> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_is_open ON compliance_issue TYPE bool DEFAULT true;
-
-DEFINE FIELD e_guard ON compliance_issue TYPE bool VALUE {
-    -- Ensure graph integrity: The employee must belong to the department being audited.
-    IF $this.a_employee.a_department != $this.a_audit.a_department {
-        THROW "DAG FRACTURE: The employee must belong to the audited department.";
-    };
+DEFINE FIELD e_guard ON badge TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'badge' { THROW "TAXONOMY_ERR: Category mismatch."; };
     RETURN true;
 } ASSERT $value = true;
 
 
--- 6. REWARD: Spends XP to acquire physical/digital items
-DEFINE TABLE reward_redemption SCHEMAFULL;
-DEFINE FIELD a_employee ON reward_redemption TYPE record<employee> REFERENCE ON DELETE CASCADE;
-DEFINE FIELD a_reward ON reward_redemption TYPE record<reward> REFERENCE ON DELETE REJECT;
-DEFINE FIELD a_qty ON reward_redemption TYPE int ASSERT $value > 0;
+DEFINE TABLE reward SCHEMAFULL;
+DEFINE FIELD a_name ON reward TYPE string;
+DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_initial_stock ON reward TYPE decimal ASSERT $value >= 0dec;
+DEFINE FIELD a_status ON reward TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON reward TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
 
-DEFINE FIELD d1_xp_spent ON reward_redemption TYPE decimal VALUE ($this.a_qty * $this.a_reward.a_xp_cost);
+DEFINE FIELD e_guard ON reward TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'reward' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
 
-DEFINE FIELD e_guard ON reward_redemption TYPE bool VALUE {
-    -- GUARD 1: Insufficient Funds (Math Constraint)
-    LET $wallet = (type::record('v_employee_wallet', [$this.a_employee.id])).available_xp ?? 0dec;
-    IF ($wallet - $this.d1_xp_spent) < 0dec {
-        THROW "MATH_ERR: Insufficient XP to redeem this reward. Participate in more activities or reduce carbon emissions.";
-    };
-    
-    -- GUARD 2: Out of Stock (Physics Constraint)
-    LET $redeemed_so_far = (type::record('v_reward_inventory', [$this.a_reward.id])).redeemed_qty ?? 0;
-    LET $remaining_stock = $this.a_reward.a_initial_stock - $redeemed_so_far;
-    IF ($remaining_stock - $this.a_qty) < 0 {
-        THROW "PHYSICS_ERR: This reward is out of stock.";
-    };
 
+DEFINE TABLE challenge SCHEMAFULL;
+DEFINE FIELD a_name ON challenge TYPE string;
+DEFINE FIELD a_xp_reward ON challenge TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_status ON challenge TYPE string DEFAULT 'Draft';
+DEFINE FIELD a_category ON challenge TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON challenge TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'challenge' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE csr_activity SCHEMAFULL;
+DEFINE FIELD a_name ON csr_activity TYPE string;
+DEFINE FIELD a_xp_reward ON csr_activity TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_status ON csr_activity TYPE string DEFAULT 'Draft';
+DEFINE FIELD a_category ON csr_activity TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON csr_activity TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'csr_activity' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE esg_policy SCHEMAFULL;
+DEFINE FIELD a_name ON esg_policy TYPE string;
+DEFINE FIELD a_status ON esg_policy TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON esg_policy TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON esg_policy TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'esg_policy' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE audit SCHEMAFULL;
+DEFINE FIELD a_name ON audit TYPE string;
+DEFINE FIELD a_status ON audit TYPE string DEFAULT 'Pending';
+DEFINE FIELD a_category ON audit TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON audit TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'audit' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE product SCHEMAFULL;
+DEFINE FIELD a_name ON product TYPE string;
+DEFINE FIELD a_status ON product TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON product TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON product TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'product' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE emission_factor SCHEMAFULL;
+DEFINE FIELD a_name ON emission_factor TYPE string;
+DEFINE FIELD a_co2e_per_unit ON emission_factor TYPE decimal ASSERT $value >= 0dec;
+DEFINE FIELD a_status ON emission_factor TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON emission_factor TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON emission_factor TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'emission_factor' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+-- ==============================================================================
+-- LEVEL 1: CONTEXTUAL BRANCHES
+-- ==============================================================================
+
+DEFINE TABLE product_esg_profile SCHEMAFULL;
+DEFINE FIELD a_product ON product_esg_profile TYPE record<product> REFERENCE ON DELETE CASCADE;
+DEFINE FIELD a_emission_factor ON product_esg_profile TYPE record<emission_factor> REFERENCE ON DELETE REJECT;
+DEFINE FIELD a_xp_penalty_per_unit ON product_esg_profile TYPE decimal DEFAULT 0dec ASSERT $value >= 0dec;
+DEFINE FIELD a_status ON product_esg_profile TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON product_esg_profile TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON product_esg_profile TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'product_esg_profile' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+DEFINE TABLE environmental_goal SCHEMAFULL;
+DEFINE FIELD a_target_co2e ON environmental_goal TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_status ON environmental_goal TYPE string DEFAULT 'Active';
+DEFINE FIELD a_category ON environmental_goal TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD e_guard ON environmental_goal TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'environmental_goal' { THROW "TAXONOMY_ERR: Category mismatch."; };
+    RETURN true;
+} ASSERT $value = true;
+
+
+-- ==============================================================================
+-- LEVEL 2: THE UNIVERSAL ESG LEDGER (Mathematical Leaves)
+-- ==============================================================================
+
+DEFINE TABLE esg_tx SCHEMAFULL;
+DEFINE FIELD a_from ON esg_tx TYPE record<user> REFERENCE ON DELETE REJECT;
+DEFINE FIELD a_to ON esg_tx TYPE record<product_esg_profile | reward | challenge | csr_activity | esg_policy | audit> REFERENCE ON DELETE REJECT;
+DEFINE FIELD a_qty ON esg_tx TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_status ON esg_tx TYPE string DEFAULT 'Pending';
+DEFINE FIELD a_category ON esg_tx TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+-- Absolute Deterministic Math (O(1) Resolution based on target Node)
+DEFINE FIELD d1_target_tb ON esg_tx TYPE string VALUE record::tb($this.a_to);
+
+DEFINE FIELD d2_xp_earned ON esg_tx TYPE decimal VALUE 
+    IF $this.d1_target_tb IN ['challenge', 'csr_activity'] THEN ($this.a_qty * ($this.a_to.a_xp_reward ?? 0dec))
+    ELSE 0dec END;
+
+DEFINE FIELD d3_xp_spent ON esg_tx TYPE decimal VALUE 
+    IF $this.d1_target_tb = 'reward' THEN ($this.a_qty * ($this.a_to.a_xp_cost ?? 0dec))
+    ELSE IF $this.d1_target_tb = 'product_esg_profile' THEN ($this.a_qty * ($this.a_to.a_xp_penalty_per_unit ?? 0dec))
+    ELSE 0dec END;
+
+DEFINE FIELD d4_net_xp ON esg_tx TYPE decimal VALUE ($this.d2_xp_earned - $this.d3_xp_spent);
+
+DEFINE FIELD d5_co2e ON esg_tx TYPE decimal VALUE 
+    IF $this.d1_target_tb = 'product_esg_profile' THEN ($this.a_qty * ($this.a_to.a_emission_factor.a_co2e_per_unit ?? 0dec))
+    ELSE 0dec END;
+
+DEFINE FIELD e_guard ON esg_tx TYPE bool VALUE {
+    IF $this.a_category != NONE AND $this.a_category.a_target_table != 'esg_tx' { THROW "TAXONOMY_ERR: Category mismatch on Ledger Transaction."; };
     RETURN true;
 } ASSERT $value = true;

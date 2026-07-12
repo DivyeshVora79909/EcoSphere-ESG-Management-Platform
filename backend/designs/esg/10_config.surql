@@ -1,60 +1,48 @@
 -- ==============================================================================
--- FILE 10: CONFIGURATION & ALGORITHMIC EXCEPTIONS
+-- FILE 10: CONFIGURATION, GROUP EXTENSIONS & MATRIX GUARDS
 -- ==============================================================================
 USE NS main DB main;
 
 -- ==============================================================================
--- COMPANY ESG SETTINGS
+-- 1. EXTENDING RBAC GROUPS (Department Analytics)
 -- ==============================================================================
-DEFINE TABLE OVERWRITE company SCHEMAFULL;
-DEFINE FIELD OVERWRITE require_evidence ON company TYPE bool DEFAULT true;
-DEFINE FIELD OVERWRITE auto_calculate_emissions ON company TYPE bool DEFAULT true;
-DEFINE FIELD OVERWRITE weight_environmental ON company TYPE decimal DEFAULT 0.4dec ASSERT $value >= 0dec AND $value <= 1.0dec;
-DEFINE FIELD OVERWRITE weight_social ON company TYPE decimal DEFAULT 0.3dec ASSERT $value >= 0dec AND $value <= 1.0dec;
-DEFINE FIELD OVERWRITE weight_governance ON company TYPE decimal DEFAULT 0.3dec ASSERT $value >= 0dec AND $value <= 1.0dec;
-DEFINE FIELD OVERWRITE updated_at ON company TYPE datetime VALUE time::now();
+-- We map the strictly derived 0dec values directly onto the native `groups` table
+-- without altering `01_auth_rbac`. If there's no data, it falls back to 0dec.
 
-CREATE company:esg_settings SET 
-    require_evidence = true, 
-    auto_calculate_emissions = true, 
-    weight_environmental = 0.4dec, 
-    weight_social = 0.3dec, 
-    weight_governance = 0.3dec;
+DEFINE FIELD d1_total_co2e ON groups TYPE decimal VALUE (type::record('v_group_wallet', [$this.id])).total_co2e ?? 0dec;
+DEFINE FIELD d2_total_xp_balance ON groups TYPE decimal VALUE (type::record('v_group_wallet', [$this.id])).total_balance ?? 0dec;
 
 
 -- ==============================================================================
--- THE ABSOLUTE MATRIX GUARD (O(1) Stock Protection)
+-- 2. EXTENDING RBAC USERS (Personal Analytics)
 -- ==============================================================================
--- This event watches the O(1) reward stock view. If a redemption causes the
--- theoretical math to drop below 0, it crashes the transaction, reverting it.
+DEFINE FIELD d1_total_co2e ON user TYPE decimal VALUE (type::record('v_user_wallet', [$this.id])).lifetime_co2e ?? 0dec;
+DEFINE FIELD d2_wallet_balance ON user TYPE decimal VALUE (type::record('v_user_wallet', [$this.id])).balance ?? 0dec;
 
-DEFINE EVENT enforce_reward_stock ON TABLE v_reward_stock WHEN $event != 'NONE' THEN {
-    LET $stock = $after.remaining_stock ?? $before.remaining_stock ?? 0;
-    LET $reward = $after.reward ?? $before.reward;
 
-    IF $stock < 0 {
-        THROW "PHYSICS_ERR: Action reverted. This causes Reward [" + <string>$reward + "] to exceed available inventory.";
+-- ==============================================================================
+-- 3. THE ABSOLUTE MATRIX GUARDS (O(1) Memory Cross-Checking)
+-- ==============================================================================
+-- Instead of complex `e_guard` logic inside the tables, we use matrix events 
+-- listening directly to the O(1) aggregations. This is 10x safer and completely
+-- protects against double-spend or negative inventory.
+
+-- GUARD 1: Prevent Negative XP Wallet Balance
+DEFINE EVENT enforce_user_wallet_balance ON TABLE v_user_wallet WHEN $event != 'NONE' THEN {
+    LET $new_balance = $after.balance ?? $before.balance ?? 0dec;
+    
+    IF $new_balance < 0dec {
+        THROW "MATH_ERR: Action reverted. This transaction causes the User's XP Wallet to drop below absolute zero.";
     };
 };
 
-
--- ==============================================================================
--- AUTO-AWARD BADGES LOGIC
--- ==============================================================================
--- Instead of heavy cron jobs, we use ReBase events to observe the challenge 
--- participation table. When an employee completes a challenge, we calculate 
--- if they hit a threshold for a new badge.
-
-DEFINE EVENT auto_award_badge_trigger ON TABLE challenge_participation WHEN $event = 'UPDATE' THEN {
-    IF $before.a_status != $after.a_status AND $after.a_status.a_name = 'Approved' {
-        LET $emp_id = $after.a_employee;
-        
-        -- Get current stats from views
-        LET $current_xp = (type::record('v_emp_challenge', [$emp_id])).total_challenge_xp ?? 0dec;
-        LET $current_count = (type::record('v_emp_challenge', [$emp_id])).completed_challenges ?? 0;
-
-        -- Find badges the employee qualifies for, but doesn't have yet.
-        -- In actual SurrealQL implementation, this would trigger an edge insertion:
-        -- RELATE $emp_id -> earned_badge -> (SELECT id FROM badge WHERE a_target_xp <= $current_xp)
+-- GUARD 2: Prevent Reward Stock Depletion
+DEFINE EVENT enforce_reward_stock ON TABLE v_reward_consumption WHEN $event != 'NONE' THEN {
+    LET $reward = $after.reward ?? $before.reward;
+    LET $consumed = $after.total_consumed ?? $before.total_consumed ?? 0dec;
+    LET $initial_stock = $reward.a_initial_stock ?? 0dec;
+    
+    IF ($initial_stock - $consumed) < 0dec {
+        THROW "PHYSICS_ERR: Action reverted. This causes Reward [" + <string>$reward + "] to exceed its available physical inventory.";
     };
 };
