@@ -108,7 +108,10 @@ DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_total_stock ON reward TYPE decimal ASSERT $value >= 0dec AND math::floor($value) = $value;
 DEFINE FIELD a_status ON reward TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON reward TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
-DEFINE FIELD d1_remaining_stock ON reward TYPE decimal VALUE $this.a_total_stock - ((type::record('v_tx_to', [$this.id, -1])).total_qty ?? 0dec);
+DEFINE FIELD d1_remaining_stock ON reward TYPE decimal VALUE {
+    LET $rec = type::record('v_tx_to', [$this.id, -1]);
+    RETURN IF record::exists($rec) THEN ($this.a_total_stock - ($rec.total_qty ?? 0dec)) ELSE $this.a_total_stock END;
+};
 DEFINE FIELD e_guard ON reward TYPE bool VALUE {
     IF $this.a_category != NONE AND $this.a_category.a_target_table != 'reward' { THROW "TAXONOMY_ERR: Category mismatch."; };
     RETURN true;
@@ -121,12 +124,27 @@ DEFINE FIELD e_guard ON reward TYPE bool VALUE {
 -- Extending base RBAC tables to house the derived states natively.
 
 DEFINE TABLE user SCHEMAFULL;
-DEFINE FIELD d1_net_xp ON user TYPE decimal VALUE (type::record('v_tx_from', [$this.id, 1])).net_xp ?? 0dec + (type::record('v_tx_from', [$this.id, -1])).net_xp ?? 0dec;
-DEFINE FIELD d2_total_co2e ON user TYPE decimal VALUE (type::record('v_tx_from', [$this.id, -1])).total_co2e ?? 0dec;
+DEFINE FIELD d1_net_xp ON user TYPE decimal VALUE {
+    LET $mint = type::record('v_tx_from', [$this.id, 1]);
+    LET $burn = type::record('v_tx_from', [$this.id, -1]);
+    LET $mint_val = IF record::exists($mint) THEN ($mint.net_xp ?? 0dec) ELSE 0dec END;
+    LET $burn_val = IF record::exists($burn) THEN ($burn.net_xp ?? 0dec) ELSE 0dec END;
+    RETURN $mint_val + $burn_val;
+};
+DEFINE FIELD d2_total_co2e ON user TYPE decimal VALUE {
+    LET $rec = type::record('v_tx_from', [$this.id, -1]);
+    RETURN IF record::exists($rec) THEN ($rec.total_co2e ?? 0dec) ELSE 0dec END;
+};
 
 DEFINE TABLE groups SCHEMAFULL;
-DEFINE FIELD d1_net_xp ON groups TYPE decimal VALUE (type::record('v_user_group', [$this.id])).net_xp ?? 0dec;
-DEFINE FIELD d2_total_co2e ON groups TYPE decimal VALUE (type::record('v_user_group', [$this.id])).total_co2e ?? 0dec;
+DEFINE FIELD d1_net_xp ON groups TYPE decimal VALUE {
+    LET $rec = type::record('v_user_group', [$this.id]);
+    RETURN IF record::exists($rec) THEN ($rec.net_xp ?? 0dec) ELSE 0dec END;
+};
+DEFINE FIELD d2_total_co2e ON groups TYPE decimal VALUE {
+    LET $rec = type::record('v_user_group', [$this.id]);
+    RETURN IF record::exists($rec) THEN ($rec.total_co2e ?? 0dec) ELSE 0dec END;
+};
 
 
 -- ==============================================================================

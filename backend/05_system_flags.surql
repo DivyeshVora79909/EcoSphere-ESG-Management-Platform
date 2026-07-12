@@ -22,9 +22,9 @@ DEFINE FIELD OVERWRITE system_ping ON TABLE environmental_goal TYPE datetime DEF
 
 DEFINE FIELD OVERWRITE system_ping ON TABLE reward TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
 
-DEFINE FIELD OVERWRITE system_ping ON TABLE user TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
+-- DEFINE FIELD OVERWRITE system_ping ON TABLE user TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
 
-DEFINE FIELD OVERWRITE system_ping ON TABLE groups TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
+-- DEFINE FIELD OVERWRITE system_ping ON TABLE groups TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
 
 DEFINE FIELD OVERWRITE system_ping ON TABLE esg_tx TYPE datetime DEFAULT time::now() PERMISSIONS FOR update NONE;
 
