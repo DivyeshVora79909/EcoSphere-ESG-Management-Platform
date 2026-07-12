@@ -2,24 +2,29 @@ import { lazy } from "solid-js";
 import { Route } from "@solidjs/router";
 import AuthGuard from "./components/AuthGuard";
 
-// Domain-Co-Located Layouts
 const AuthLayout = lazy(() => import("./pages/auth/AuthLayout"));
 const MainLayout = lazy(() => import("./pages/MainLayout"));
 
-// Public Nodes
 const Login = lazy(() => import("./pages/auth/Login"));
 const Forgot = lazy(() => import("./pages/auth/Forgot"));
 const Verify = lazy(() => import("./pages/auth/Verify"));
 const SignUp = lazy(() => import("./pages/auth/SignUp"));
 
-// Private Nodes
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const UserSystem = lazy(() => import("./pages/users/UserSystem"));
+const DepartmentSystem = lazy(
+  () => import("./pages/departments/DepartmentSystem"),
+);
+
+// New ESG Modules
+const RewardSystem = lazy(() => import("./pages/rewards/RewardSystem"));
+const ChallengeSystem = lazy(
+  () => import("./pages/challenges/ChallengeSystem"),
+);
 
 export default function App() {
   return (
     <>
-      {/* PUBLIC DAG */}
       <Route path="/auth" component={AuthLayout}>
         <Route path="/login" component={Login} />
         <Route path="/signup" component={SignUp} />
@@ -27,11 +32,13 @@ export default function App() {
         <Route path="/verify" component={Verify} />
       </Route>
 
-      {/* PROTECTED DAG */}
       <Route path="/" component={AuthGuard}>
         <Route path="/" component={MainLayout}>
           <Route path="/" component={Dashboard} />
           <Route path="/users" component={UserSystem} />
+          <Route path="/departments" component={DepartmentSystem} />
+          <Route path="/rewards" component={RewardSystem} />
+          <Route path="/challenges" component={ChallengeSystem} />
         </Route>
       </Route>
     </>

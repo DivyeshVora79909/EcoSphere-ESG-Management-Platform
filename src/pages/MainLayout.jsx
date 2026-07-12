@@ -11,6 +11,9 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
+  Gift,
+  Target,
 } from "lucide-solid";
 
 export default function MainLayout(props) {
@@ -30,6 +33,24 @@ export default function MainLayout(props) {
       icon: <Users size={20} />,
       label: "Access & Nodes",
       module: "users",
+    },
+    {
+      path: "/departments",
+      icon: <Building2 size={20} />,
+      label: "Departments",
+      module: "departments",
+    },
+    {
+      path: "/challenges",
+      icon: <Target size={20} />,
+      label: "Challenges",
+      module: "challenges",
+    },
+    {
+      path: "/rewards",
+      icon: <Gift size={20} />,
+      label: "Reward Catalog",
+      module: "rewards",
     },
   ];
 
