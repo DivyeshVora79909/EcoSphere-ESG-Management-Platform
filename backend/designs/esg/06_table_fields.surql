@@ -16,13 +16,6 @@ DEFINE FIELD a_required_xp ON badge TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON badge TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON badge TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
 
-DEFINE TABLE reward SCHEMAFULL;
-DEFINE FIELD a_name ON reward TYPE string;
-DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
-DEFINE FIELD a_total_stock ON reward TYPE decimal ASSERT $value >= 0dec AND math::floor($value) = $value;
-DEFINE FIELD a_status ON reward TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
-DEFINE FIELD a_category ON reward TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
-
 DEFINE TABLE challenge SCHEMAFULL;
 DEFINE FIELD a_name ON challenge TYPE string;
 DEFINE FIELD a_xp_reward ON challenge TYPE decimal ASSERT $value > 0dec;
@@ -58,7 +51,7 @@ DEFINE FIELD a_category ON emission_factor TYPE option<record<category>> REFEREN
 
 
 -- ==============================================================================
--- LEVEL 1: CONTEXTUAL BRANCHES
+-- LEVEL 1: CONTEXTUAL BRANCHES & DERIVED PARENTS
 -- ==============================================================================
 DEFINE TABLE product_esg_profile SCHEMAFULL;
 DEFINE FIELD a_product ON product_esg_profile TYPE record<product> REFERENCE ON DELETE CASCADE;
@@ -72,9 +65,33 @@ DEFINE FIELD a_target_co2e ON environmental_goal TYPE decimal ASSERT $value > 0d
 DEFINE FIELD a_status ON environmental_goal TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
 DEFINE FIELD a_category ON environmental_goal TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
 
+-- Reward Engine (Self-Resolving Inventory)
+DEFINE TABLE reward SCHEMAFULL;
+DEFINE FIELD a_name ON reward TYPE string;
+DEFINE FIELD a_xp_cost ON reward TYPE decimal ASSERT $value > 0dec;
+DEFINE FIELD a_total_stock ON reward TYPE decimal ASSERT $value >= 0dec AND math::floor($value) = $value;
+DEFINE FIELD a_status ON reward TYPE string ASSERT $value IN ['Draft', 'Active', 'Archived'] DEFAULT 'Active';
+DEFINE FIELD a_category ON reward TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
+
+DEFINE FIELD d1_remaining_stock ON reward TYPE decimal VALUE $this.a_total_stock - ((type::record('v_tx_to', [$this.id, -1])).total_qty ?? 0dec);
+
 
 -- ==============================================================================
--- LEVEL 2: THE UNIVERSAL VECTOR LEDGER
+-- LEVEL 2: SYSTEM ACTORS (Graph Upward Propagation Nodes)
+-- ==============================================================================
+-- Extending base RBAC tables to house the derived states natively.
+
+DEFINE TABLE user SCHEMAFULL;
+DEFINE FIELD d1_net_xp ON user TYPE decimal VALUE (type::record('v_tx_from', [$this.id, 1])).net_xp ?? 0dec + (type::record('v_tx_from', [$this.id, -1])).net_xp ?? 0dec;
+DEFINE FIELD d2_total_co2e ON user TYPE decimal VALUE (type::record('v_tx_from', [$this.id, -1])).total_co2e ?? 0dec;
+
+DEFINE TABLE groups SCHEMAFULL;
+DEFINE FIELD d1_net_xp ON groups TYPE decimal VALUE (type::record('v_user_group', [$this.id])).net_xp ?? 0dec;
+DEFINE FIELD d2_total_co2e ON groups TYPE decimal VALUE (type::record('v_user_group', [$this.id])).total_co2e ?? 0dec;
+
+
+-- ==============================================================================
+-- LEVEL 3: THE UNIVERSAL VECTOR LEDGER
 -- ==============================================================================
 DEFINE TABLE esg_tx SCHEMAFULL;
 DEFINE FIELD a_from ON esg_tx TYPE record<user> REFERENCE ON DELETE REJECT;
@@ -83,40 +100,42 @@ DEFINE FIELD a_qty ON esg_tx TYPE decimal ASSERT $value > 0dec;
 DEFINE FIELD a_status ON esg_tx TYPE string ASSERT $value IN ['Draft', 'Posted', 'Cancelled'] DEFAULT 'Draft';
 DEFINE FIELD a_category ON esg_tx TYPE option<record<category>> REFERENCE ON DELETE REJECT DEFAULT NONE;
 
--- Inherit FX Rates at the time of transaction
+-- FX Rates inherited securely from parent context
 DEFINE FIELD a_xp_rate ON esg_tx TYPE decimal VALUE $this.a_to.a_xp_cost ?? $this.a_to.a_xp_reward ?? $this.a_to.a_xp_penalty_per_unit ?? 0dec;
 DEFINE FIELD a_co2e_rate ON esg_tx TYPE decimal VALUE $this.a_to.a_emission_factor.a_co2e_per_unit ?? 0dec;
 
--- Vector Engine
+-- The Physics Vector (-1 for Burns/Penalties, 1 for Mints/Awards)
 DEFINE FIELD d1_target_tb ON esg_tx TYPE string VALUE record::tb($this.a_to);
 DEFINE FIELD d2_vector ON esg_tx TYPE int VALUE 
     IF $this.d1_target_tb IN ['challenge', 'csr_activity'] THEN 1 
     ELSE IF $this.d1_target_tb IN ['reward', 'product_esg_profile'] THEN -1 
     ELSE 0 END;
 
--- Base Values
+-- Absolute Ledger Math
 DEFINE FIELD d3_raw_xp ON esg_tx TYPE decimal VALUE ($this.a_qty * $this.a_xp_rate);
 DEFINE FIELD d4_net_xp ON esg_tx TYPE decimal VALUE ($this.d3_raw_xp * $this.d2_vector);
 DEFINE FIELD d5_raw_co2e ON esg_tx TYPE decimal VALUE ($this.a_qty * $this.a_co2e_rate);
 
--- Absolute Physics Engine (Internal Guardrails)
+-- Internal Matrix Guard
 DEFINE FIELD e_guard ON esg_tx TYPE bool VALUE {
-    -- 1. Discrete Math Assertion
+    -- 1. Discrete Physical Constraint
     IF $this.d1_target_tb = 'reward' AND math::floor($this.a_qty) != $this.a_qty {
-        THROW "PHYSICS_ERR: Reward redemptions must use discrete integer quantities.";
+        THROW "PHYSICS_ERR: Redemptions must use exact integer quantities.";
     };
 
-    -- 2. Wallet Balance Guard (Upward View Resolution)
-    LET $wallet_balance = (type::record('v_tx_from_posted', [$this.a_from.id])).net_xp ?? 0dec;
-    IF $wallet_balance < 0dec {
-        THROW "MATH_ERR: Transaction reversed. User XP Wallet dropped below zero.";
-    };
-
-    -- 3. Stock Limit Guard (Upward View Resolution)
+    -- 2. Prevent Overspending via the Parent's Derived State
     IF $this.d1_target_tb = 'reward' {
-        LET $consumed = (type::record('v_tx_to_posted', [$this.a_to.id])).total_qty ?? 0dec;
-        IF ($this.a_to.a_total_stock - $consumed) < 0dec {
-            THROW "PHYSICS_ERR: Transaction reversed. Reward stock depleted.";
+        LET $remaining = $this.a_to.d1_remaining_stock ?? 0dec;
+        IF ($remaining - $this.a_qty) < 0dec {
+            THROW "PHYSICS_ERR: This Reward is out of stock.";
+        };
+    };
+
+    -- 3. Prevent Negative Wallet via the Sender's Derived State
+    IF $this.d2_vector = -1 {
+        LET $wallet = $this.a_from.d1_net_xp ?? 0dec;
+        IF ($wallet + $this.d4_net_xp) < 0dec { 
+            THROW "MATH_ERR: Insufficient XP Wallet balance."; 
         };
     };
 
