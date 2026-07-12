@@ -1,98 +1,46 @@
-graph TD
+flowchart TD
+    classDef system fill:#636e72,stroke:#b2bec3,stroke-width:2px,color:#fff;
+    classDef anchor fill:#2d3436,stroke:#dfe6e9,stroke-width:2px,color:#fff;
+    classDef branch fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
+    classDef leaf fill:#fdcb6e,stroke:#ffeaa7,stroke-width:2px,color:#2d3436;
+    classDef tag fill:#e84393,stroke:#fd79a8,stroke-width:2px,color:#fff;
 
-subgraph L0["Level 0"]
-ORG[Organization]
-end
+    subgraph SYS [System Ecosystem]
+        USER((user)):::system
+        GROUPS((groups)):::system
+    end
 
-subgraph L1["Level 1 : Organization Configuration"]
+    subgraph L0 [Level 0: Independent Anchors]
+        CATEGORY((category)):::tag
+        PRODUCT((product)):::anchor
+        EMISSION((emission_factor)):::anchor
+        POLICY((esg_policy)):::anchor
+        REWARD((reward)):::anchor
+        CHALLENGE((challenge)):::anchor
+        AUDIT((audit)):::anchor
+        CSR((csr_activity)):::anchor
+        BADGE((badge)):::anchor
+    end
 
-DEPT[Department]
+    subgraph L1 [Level 1: Contextual Branches]
+        PROFILE[product_esg_profile]:::branch
+        GOAL[environmental_goal]:::branch
+    end
 
-CATEGORY[Category]
+    subgraph L2 [Level 2: The Universal Ledger Leaf]
+        TX[esg_transaction]:::leaf
+    end
 
-PRODUCT[Product]
+    %% Level 1 Structural Edges
+    PROFILE -- "a_product / a_emission" --> PRODUCT & EMISSION
+    GOAL -- "a_group" --> GROUPS
+    
+    %% The Absolute Graph Engine (Polymorphic Double-Entry)
+    TX -- "a_from / a_to" --> USER & GROUPS
+    TX -- "a_from / a_to" --> PROFILE & CSR & CHALLENGE & POLICY & REWARD & AUDIT
 
-EMISSION[Emission Factor]
+    %% Universal State Classification
+    CATEGORY -. "a_category Classification Engine" .-> TX & PROFILE & GOAL & L0
 
-GOAL[Environmental Goal]
-
-POLICY[ESG Policy]
-
-BADGE[Badge]
-
-REWARD[Reward]
-
-CHALLENGE[Challenge]
-
-AUDIT[Audit]
-
-end
-
-DEPT --> ORG
-CATEGORY --> ORG
-PRODUCT --> ORG
-EMISSION --> ORG
-GOAL --> ORG
-POLICY --> ORG
-BADGE --> ORG
-REWARD --> ORG
-CHALLENGE --> ORG
-AUDIT --> ORG
-
-subgraph L2["Level 2"]
-
-EMPLOYEE[Employee]
-
-PROFILE[Product ESG Profile]
-
-CSR[CSR Activity]
-
-end
-
-EMPLOYEE --> DEPT
-
-PROFILE --> PRODUCT
-PROFILE --> EMISSION
-
-CSR --> CATEGORY
-CSR --> DEPT
-
-subgraph L3["Level 3"]
-
-CARBON[Carbon Transaction]
-
-CSRPART[CSR Participation]
-
-CHPART[Challenge Participation]
-
-POLACK[Policy Acknowledgement]
-
-BADGEAWARD[Badge Award]
-
-REWARDREDEEM[Reward Redemption]
-
-ISSUE[Compliance Issue]
-
-end
-
-CARBON --> PROFILE
-CARBON --> DEPT
-CARBON --> EMPLOYEE
-
-CSRPART --> CSR
-CSRPART --> EMPLOYEE
-
-CHPART --> CHALLENGE
-CHPART --> EMPLOYEE
-
-POLACK --> POLICY
-POLACK --> EMPLOYEE
-
-BADGEAWARD --> BADGE
-BADGEAWARD --> EMPLOYEE
-
-REWARDREDEEM --> REWARD
-REWARDREDEEM --> EMPLOYEE
-
-ISSUE --> AUDIT
-ISSUE --> EMPLOYEE
+    %% Frontend Derived Logic (No math connections)
+    BADGE -. "Derived in Views" .- USER
