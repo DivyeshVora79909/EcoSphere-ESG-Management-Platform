@@ -1,99 +1,38 @@
 -- ==============================================================================
--- FILE 07: O(1) AGGREGATIONS & BI VIEWS (THE OLAP CUBE)
+-- FILE 07: O(1) AGGREGATIONS & VECTOR VIEWS
 -- ==============================================================================
 USE NS main DB main;
 
 -- ==============================================================================
--- 1. TRANSACTION MATRIX (Grouped by Relation, Status, Category)
+-- 1. VECTOR MATRIX (Segmented by Direction)
 -- ==============================================================================
+DEFINE TABLE OVERWRITE v_tx_from_vec AS SELECT a_from AS user, d2_vector AS vector, math::sum(a_qty) AS total_qty, math::sum(d3_raw_xp) AS raw_xp, math::max(d3_raw_xp) AS max_xp_event, math::mean(d3_raw_xp) AS mean_xp, math::sum(d5_raw_co2e) AS raw_co2e FROM esg_tx GROUP BY user, vector;
 
--- FROM perspective: What did the User do?
-DEFINE TABLE OVERWRITE v_tx_from_ctx AS 
-    SELECT 
-        a_from AS user, 
-        a_status AS status, 
-        a_category AS category, 
-        math::sum(a_qty) AS total_qty, 
-        math::sum(d2_xp_earned) AS xp_earned, 
-        math::sum(d3_xp_spent) AS xp_spent, 
-        math::sum(d4_net_xp) AS net_xp, 
-        math::sum(d5_co2e) AS co2e 
-    FROM esg_tx 
-    GROUP BY user, status, category;
-
--- TO perspective: How did the Anchor perform? (E.g., How many approvals did Challenge X get?)
-DEFINE TABLE OVERWRITE v_tx_to_ctx AS 
-    SELECT 
-        a_to AS target, 
-        a_status AS status, 
-        a_category AS category, 
-        math::sum(a_qty) AS total_qty, 
-        math::sum(d2_xp_earned) AS xp_minted, 
-        math::sum(d3_xp_spent) AS xp_consumed, 
-        math::sum(d5_co2e) AS co2e_generated 
-    FROM esg_tx 
-    GROUP BY target, status, category;
-
+DEFINE TABLE OVERWRITE v_tx_to_vec AS SELECT a_to AS target, d2_vector AS vector, math::sum(a_qty) AS total_qty, math::sum(d3_raw_xp) AS raw_xp, math::max(a_qty) AS max_qty, math::sum(d5_raw_co2e) AS raw_co2e FROM esg_tx GROUP BY target, vector;
 
 -- ==============================================================================
--- 2. MATHEMATICAL ABSOLUTES (Strict 'Approved' States for Guardrails)
+-- 2. CATEGORY MATRIX (Segmented by Taxonomy)
 -- ==============================================================================
+DEFINE TABLE OVERWRITE v_tx_from_cat_vec AS SELECT a_from AS user, a_category AS category, d2_vector AS vector, math::sum(a_qty) AS total_qty, math::sum(d3_raw_xp) AS raw_xp, math::sum(d5_raw_co2e) AS raw_co2e FROM esg_tx GROUP BY user, category, vector;
 
--- The absolute Wallet Balance (Only counts finalized/approved math)
-DEFINE TABLE OVERWRITE v_user_wallet AS 
-    SELECT 
-        a_from AS user, 
-        math::sum(d4_net_xp) AS balance, 
-        math::sum(d5_co2e) AS lifetime_co2e 
-    FROM esg_tx 
-    WHERE a_status = 'Approved' 
-    GROUP BY user;
-
--- The absolute Reward Inventory consumed
-DEFINE TABLE OVERWRITE v_reward_consumption AS 
-    SELECT 
-        a_to AS reward, 
-        math::sum(a_qty) AS total_consumed 
-    FROM esg_tx 
-    WHERE record::tb(a_to) = 'reward' AND a_status = 'Approved' 
-    GROUP BY reward;
-
+DEFINE TABLE OVERWRITE v_tx_to_cat_vec AS SELECT a_to AS target, a_category AS category, d2_vector AS vector, math::sum(a_qty) AS total_qty, math::sum(d3_raw_xp) AS raw_xp, math::sum(d5_raw_co2e) AS raw_co2e FROM esg_tx GROUP BY target, category, vector;
 
 -- ==============================================================================
--- 3. THE BADGE PHANTOM (100% Derived View)
+-- 3. THE ABSOLUTE STATE (Filtered by 'Posted') 
 -- ==============================================================================
--- This uses SurrealDB subqueries to instantly map users to the badges they mathematically qualify for.
+-- These views power the Physics Engine in File 06. They represent historical truth.
 
-DEFINE TABLE OVERWRITE v_user_badges AS 
-    SELECT 
-        user, 
-        balance AS current_xp,
-        (SELECT id, a_name FROM badge WHERE a_required_xp <= $parent.balance AND a_status = 'Active') AS unlocked_badges 
-    FROM v_user_wallet;
+DEFINE TABLE OVERWRITE v_tx_from_posted AS SELECT a_from AS user, math::sum(a_qty) AS total_qty, math::sum(d4_net_xp) AS net_xp, math::max(d4_net_xp) AS max_net_xp, math::min(d4_net_xp) AS min_net_xp, math::sum(d5_raw_co2e) AS net_co2e FROM esg_tx WHERE a_status = 'Posted' GROUP BY user;
 
+DEFINE TABLE OVERWRITE v_tx_to_posted AS SELECT a_to AS target, math::sum(a_qty) AS total_qty, math::sum(d4_net_xp) AS net_xp, math::sum(d5_raw_co2e) AS net_co2e FROM esg_tx WHERE a_status = 'Posted' GROUP BY target;
+
+DEFINE TABLE OVERWRITE v_tx_from_cat_posted AS SELECT a_from AS user, a_category AS category, math::sum(a_qty) AS total_qty, math::sum(d4_net_xp) AS net_xp, math::sum(d5_raw_co2e) AS net_co2e FROM esg_tx WHERE a_status = 'Posted' GROUP BY user, category;
+
+DEFINE TABLE OVERWRITE v_tx_to_cat_posted AS SELECT a_to AS target, a_category AS category, math::sum(a_qty) AS total_qty, math::sum(d4_net_xp) AS net_xp, math::sum(d5_raw_co2e) AS net_co2e FROM esg_tx WHERE a_status = 'Posted' GROUP BY target, category;
 
 -- ==============================================================================
--- 4. DEPARTMENTAL ROLLUPS (Grouping by the natively derived RBAC 'owned_by')
+-- 4. DEPARTMENTAL ROLLUPS (RBAC Groups)
 -- ==============================================================================
--- By checking a_from.owned_by, we effortlessly roll up users into their Groups (Departments).
+-- Bypassing the user to map directly to their parent RBAC Group (Department).
 
-DEFINE TABLE OVERWRITE v_group_esg_ctx AS 
-    SELECT 
-        a_from.owned_by AS group, 
-        a_status AS status, 
-        a_category AS category, 
-        math::sum(d2_xp_earned) AS xp_earned, 
-        math::sum(d3_xp_spent) AS xp_spent, 
-        math::sum(d4_net_xp) AS net_xp, 
-        math::sum(d5_co2e) AS co2e 
-    FROM esg_tx 
-    GROUP BY group, status, category;
-
-DEFINE TABLE OVERWRITE v_group_wallet AS 
-    SELECT 
-        a_from.owned_by AS group, 
-        math::sum(d4_net_xp) AS total_balance, 
-        math::sum(d5_co2e) AS total_co2e 
-    FROM esg_tx 
-    WHERE a_status = 'Approved' 
-    GROUP BY group;
+DEFINE TABLE OVERWRITE v_tx_group_posted AS SELECT a_from.owned_by AS group, math::sum(a_qty) AS total_qty, math::sum(d4_net_xp) AS net_xp, math::sum(d5_raw_co2e) AS net_co2e FROM esg_tx WHERE a_status = 'Posted' GROUP BY group;
