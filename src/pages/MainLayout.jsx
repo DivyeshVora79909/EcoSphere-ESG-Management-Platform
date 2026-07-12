@@ -52,6 +52,12 @@ export default function MainLayout(props) {
       label: "Reward Catalog",
       module: "rewards",
     },
+    {
+      path: "/ledger",
+      icon: <Activity size={20} />,
+      label: "Universal Ledger",
+      module: "ledger",
+    },
   ];
 
   return (

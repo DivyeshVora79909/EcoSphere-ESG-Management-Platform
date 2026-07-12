@@ -21,6 +21,7 @@ const RewardSystem = lazy(() => import("./pages/rewards/RewardSystem"));
 const ChallengeSystem = lazy(
   () => import("./pages/challenges/ChallengeSystem"),
 );
+const LedgerSystem = lazy(() => import("./pages/ledger/LedgerSystem"));
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/departments" component={DepartmentSystem} />
           <Route path="/rewards" component={RewardSystem} />
           <Route path="/challenges" component={ChallengeSystem} />
+          <Route path="/ledger" component={LedgerSystem} />
         </Route>
       </Route>
     </>
