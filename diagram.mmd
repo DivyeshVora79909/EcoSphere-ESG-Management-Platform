@@ -1,0 +1,98 @@
+graph TD
+
+subgraph L0["Level 0"]
+ORG[Organization]
+end
+
+subgraph L1["Level 1 : Organization Configuration"]
+
+DEPT[Department]
+
+CATEGORY[Category]
+
+PRODUCT[Product]
+
+EMISSION[Emission Factor]
+
+GOAL[Environmental Goal]
+
+POLICY[ESG Policy]
+
+BADGE[Badge]
+
+REWARD[Reward]
+
+CHALLENGE[Challenge]
+
+AUDIT[Audit]
+
+end
+
+DEPT --> ORG
+CATEGORY --> ORG
+PRODUCT --> ORG
+EMISSION --> ORG
+GOAL --> ORG
+POLICY --> ORG
+BADGE --> ORG
+REWARD --> ORG
+CHALLENGE --> ORG
+AUDIT --> ORG
+
+subgraph L2["Level 2"]
+
+EMPLOYEE[Employee]
+
+PROFILE[Product ESG Profile]
+
+CSR[CSR Activity]
+
+end
+
+EMPLOYEE --> DEPT
+
+PROFILE --> PRODUCT
+PROFILE --> EMISSION
+
+CSR --> CATEGORY
+CSR --> DEPT
+
+subgraph L3["Level 3"]
+
+CARBON[Carbon Transaction]
+
+CSRPART[CSR Participation]
+
+CHPART[Challenge Participation]
+
+POLACK[Policy Acknowledgement]
+
+BADGEAWARD[Badge Award]
+
+REWARDREDEEM[Reward Redemption]
+
+ISSUE[Compliance Issue]
+
+end
+
+CARBON --> PROFILE
+CARBON --> DEPT
+CARBON --> EMPLOYEE
+
+CSRPART --> CSR
+CSRPART --> EMPLOYEE
+
+CHPART --> CHALLENGE
+CHPART --> EMPLOYEE
+
+POLACK --> POLICY
+POLACK --> EMPLOYEE
+
+BADGEAWARD --> BADGE
+BADGEAWARD --> EMPLOYEE
+
+REWARDREDEEM --> REWARD
+REWARDREDEEM --> EMPLOYEE
+
+ISSUE --> AUDIT
+ISSUE --> EMPLOYEE
