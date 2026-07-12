@@ -34,10 +34,10 @@ DEFINE TABLE OVERWRITE user SCHEMAFULL PERMISSIONS
     DEFINE FIELD OVERWRITE last_suspended_at ON user TYPE option<datetime> DEFAULT NONE PERMISSIONS NONE;
     DEFINE FIELD OVERWRITE total_suspensions ON user TYPE option<int> DEFAULT 0 PERMISSIONS NONE;
 
-    DEFINE FIELD OVERWRITE last_refreshed_at ON user TYPE option<datetime> DEFAULT NONE PERMISSIONS NONE;
+    DEFINE FIELD OVERWRITE last_refreshed_at ON user TYPE option<datetime> DEFAULT NONE;
     DEFINE FIELD OVERWRITE total_refreshes ON user TYPE option<int> DEFAULT 0 PERMISSIONS NONE;
 
-    DEFINE FIELD OVERWRITE last_send_token_at ON user TYPE option<datetime> DEFAULT NONE PERMISSIONS NONE;
+    DEFINE FIELD OVERWRITE last_send_token_at ON user TYPE option<datetime> DEFAULT NONE;
     DEFINE FIELD OVERWRITE total_tokens_sent ON user TYPE option<int> DEFAULT 0 PERMISSIONS NONE;
 
     DEFINE FIELD OVERWRITE last_deactivated_at ON user TYPE option<datetime> DEFAULT NONE PERMISSIONS NONE;
