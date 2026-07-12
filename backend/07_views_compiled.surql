@@ -1,135 +1,99 @@
 -- ==============================================================================
--- FILE 07: O(1) AGGREGATIONS & BI VIEWS (MATHEMATICAL CRM DAG)
+-- FILE 07: O(1) AGGREGATIONS & BI VIEWS (THE OLAP CUBE)
 -- ==============================================================================
 USE NS main DB main;
 
 -- ==============================================================================
--- 1. POLYMORPHIC LEAVES (Graph Cross-Cutting Totals)
+-- 1. TRANSACTION MATRIX (Grouped by Relation, Status, Category)
 -- ==============================================================================
--- Because a_target is polymorphic, these views automatically partition across 
--- Person, Org, Opportunity, Quote, Order, and Campaign purely by their Record ID.
 
-DEFINE TABLE OVERWRITE v_task_target AS SELECT a_target AS target, count() AS total_tasks FROM task GROUP BY target
-    PERMISSIONS FOR select WHERE ('task_select' IN $auth.permissions AND (target.readers CONTAINSANY $auth.parents OR target.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-DEFINE TABLE OVERWRITE v_activity_target AS SELECT a_target AS target, count() AS total_activities FROM activity GROUP BY target
-    PERMISSIONS FOR select WHERE ('activity_select' IN $auth.permissions AND (target.readers CONTAINSANY $auth.parents OR target.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-DEFINE TABLE OVERWRITE v_note_target AS SELECT a_target AS target, count() AS total_notes FROM note GROUP BY target
-    PERMISSIONS FOR select WHERE ('note_select' IN $auth.permissions AND (target.readers CONTAINSANY $auth.parents OR target.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-DEFINE TABLE OVERWRITE v_attachment_target AS SELECT a_target AS target, count() AS total_attachments, math::sum(a_file_size_bytes) AS total_bytes FROM attachment GROUP BY target
-    PERMISSIONS FOR select WHERE ('attachment_select' IN $auth.permissions AND (target.readers CONTAINSANY $auth.parents OR target.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+-- FROM perspective: What did the User do?
+DEFINE TABLE OVERWRITE v_tx_from_ctx AS 
+    SELECT 
+        a_from AS user, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(a_qty) AS total_qty, 
+        math::sum(d2_xp_earned) AS xp_earned, 
+        math::sum(d3_xp_spent) AS xp_spent, 
+        math::sum(d4_net_xp) AS net_xp, 
+        math::sum(d5_co2e) AS co2e 
+    FROM esg_tx 
+    GROUP BY user, status, category;
 
-
--- ==============================================================================
--- 2. TRANSACTION LINES -> DIRECT PARENT (Subtotals)
--- ==============================================================================
--- These views give the immediate mathematical state to the exact parent document.
-
-DEFINE TABLE OVERWRITE v_oppl_opp AS SELECT a_opportunity AS opportunity, count() AS line_count, math::sum(a_qty) AS sum_qty, math::sum(d2_net_base) AS sum_net, math::sum(a_discount) AS sum_discount FROM opportunity_line GROUP BY opportunity
-    PERMISSIONS FOR select WHERE ('opportunity_line_select' IN $auth.permissions AND (opportunity.readers CONTAINSANY $auth.parents OR opportunity.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_quotel_quote AS SELECT a_quote AS quote, count() AS line_count, math::sum(a_qty) AS sum_qty, math::sum(d2_net_base) AS sum_net, math::sum(a_discount) AS sum_discount FROM quote_line GROUP BY quote
-    PERMISSIONS FOR select WHERE ('quote_line_select' IN $auth.permissions AND (quote.readers CONTAINSANY $auth.parents OR quote.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_orderl_order AS SELECT a_order AS order, count() AS line_count, math::sum(a_qty) AS sum_qty, math::sum(d2_net_base) AS sum_net, math::sum(a_discount) AS sum_discount FROM order_line GROUP BY order
-    PERMISSIONS FOR select WHERE ('order_line_select' IN $auth.permissions AND (order.readers CONTAINSANY $auth.parents OR order.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+-- TO perspective: How did the Anchor perform? (E.g., How many approvals did Challenge X get?)
+DEFINE TABLE OVERWRITE v_tx_to_ctx AS 
+    SELECT 
+        a_to AS target, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(a_qty) AS total_qty, 
+        math::sum(d2_xp_earned) AS xp_minted, 
+        math::sum(d3_xp_spent) AS xp_consumed, 
+        math::sum(d5_co2e) AS co2e_generated 
+    FROM esg_tx 
+    GROUP BY target, status, category;
 
 
 -- ==============================================================================
--- 3. DAG STRUCTURAL TRACKING (The "Shadow State")
+-- 2. MATHEMATICAL ABSOLUTES (Strict 'Approved' States for Guardrails)
 -- ==============================================================================
--- Instead of using status strings (e.g., "Quoted", "Ordered"), we determine reality 
--- by mathematically checking if the downward graph edges exist.
 
--- How many quotes does an opportunity have?
-DEFINE TABLE OVERWRITE v_quote_opp AS SELECT a_opportunity AS opportunity, count() AS total_quotes FROM quote GROUP BY opportunity
-    PERMISSIONS FOR select WHERE ('quote_select' IN $auth.permissions AND (opportunity.readers CONTAINSANY $auth.parents OR opportunity.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+-- The absolute Wallet Balance (Only counts finalized/approved math)
+DEFINE TABLE OVERWRITE v_user_wallet AS 
+    SELECT 
+        a_from AS user, 
+        math::sum(d4_net_xp) AS balance, 
+        math::sum(d5_co2e) AS lifetime_co2e 
+    FROM esg_tx 
+    WHERE a_status = 'Approved' 
+    GROUP BY user;
 
--- How many orders spawned from this parent (Quote OR Opportunity)?
-DEFINE TABLE OVERWRITE v_order_parent AS SELECT a_parent AS parent, count() AS total_orders FROM order GROUP BY parent
-    PERMISSIONS FOR select WHERE ('order_select' IN $auth.permissions AND (parent.readers CONTAINSANY $auth.parents OR parent.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-
--- ==============================================================================
--- 4. PRODUCT CATALOG ANALYTICS (Line -> Product)
--- ==============================================================================
--- Computes the performance, price variance, and velocity of every product in the catalog.
-
-DEFINE TABLE OVERWRITE v_oppl_prod AS SELECT a_product AS product, count() AS opp_freq, math::sum(a_qty) AS pipeline_qty, math::sum(d2_net_base) AS pipeline_val FROM opportunity_line GROUP BY product
-    PERMISSIONS FOR select WHERE ('opportunity_line_select' IN $auth.permissions AND (product.readers CONTAINSANY $auth.parents OR product.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_quotel_prod AS SELECT a_product AS product, count() AS quote_freq, math::sum(a_qty) AS quoted_qty, math::sum(d2_net_base) AS quoted_val FROM quote_line GROUP BY product
-    PERMISSIONS FOR select WHERE ('quote_line_select' IN $auth.permissions AND (product.readers CONTAINSANY $auth.parents OR product.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_orderl_prod AS SELECT a_product AS product, count() AS order_freq, math::sum(a_qty) AS sold_qty, math::sum(d2_net_base) AS sold_val, math::mean(a_price) AS avg_sold_price, math::variance(a_price) AS var_sold_price, math::max(a_price) AS max_price, math::min(a_price) AS min_price FROM order_line GROUP BY product
-    PERMISSIONS FOR select WHERE ('order_line_select' IN $auth.permissions AND (product.readers CONTAINSANY $auth.parents OR product.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+-- The absolute Reward Inventory consumed
+DEFINE TABLE OVERWRITE v_reward_consumption AS 
+    SELECT 
+        a_to AS reward, 
+        math::sum(a_qty) AS total_consumed 
+    FROM esg_tx 
+    WHERE record::tb(a_to) = 'reward' AND a_status = 'Approved' 
+    GROUP BY reward;
 
 
 -- ==============================================================================
--- 5. DAG SKIPS -> ORGANIZATION (Lifetime Value & Pipeline Health)
+-- 3. THE BADGE PHANTOM (100% Derived View)
 -- ==============================================================================
--- This is where the magic happens. We skip the middleman tables and group 
--- the mathematical lines directly by their ultimate Organization target.
+-- This uses SurrealDB subqueries to instantly map users to the badges they mathematically qualify for.
 
-DEFINE TABLE OVERWRITE v_opp_org AS SELECT a_organization AS org, count() AS total_opps, math::mean(a_probability) AS avg_probability FROM opportunity GROUP BY org
-    PERMISSIONS FOR select WHERE ('opportunity_select' IN $auth.permissions AND (org.readers CONTAINSANY $auth.parents OR org.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_oppl_org AS SELECT a_opportunity.a_organization AS org, math::sum(d2_net_base) AS total_pipeline_val FROM opportunity_line GROUP BY org
-    PERMISSIONS FOR select WHERE ('opportunity_line_select' IN $auth.permissions AND (org.readers CONTAINSANY $auth.parents OR org.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_order_org AS SELECT a_organization AS org, count() AS total_orders FROM order GROUP BY org
-    PERMISSIONS FOR select WHERE ('order_select' IN $auth.permissions AND (org.readers CONTAINSANY $auth.parents OR org.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-DEFINE TABLE OVERWRITE v_orderl_org AS SELECT a_order.a_organization AS org, math::sum(d2_net_base) AS lifetime_val, math::sum(a_qty) AS lifetime_items FROM order_line GROUP BY org
-    PERMISSIONS FOR select WHERE ('order_line_select' IN $auth.permissions AND (org.readers CONTAINSANY $auth.parents OR org.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+DEFINE TABLE OVERWRITE v_user_badges AS 
+    SELECT 
+        user, 
+        balance AS current_xp,
+        (SELECT id, a_name FROM badge WHERE a_required_xp <= $parent.balance AND a_status = 'Active') AS unlocked_badges 
+    FROM v_user_wallet;
 
 
 -- ==============================================================================
--- 6. DAG SKIPS -> PERSON (B2C & Contact Impact)
+-- 4. DEPARTMENTAL ROLLUPS (Grouping by the natively derived RBAC 'owned_by')
 -- ==============================================================================
--- Tracks the pipeline value tied directly to individual people.
+-- By checking a_from.owned_by, we effortlessly roll up users into their Groups (Departments).
 
-DEFINE TABLE OVERWRITE v_opp_person AS SELECT a_person AS person, count() AS total_opps FROM opportunity GROUP BY person
-    PERMISSIONS FOR select WHERE ('opportunity_select' IN $auth.permissions AND (person.readers CONTAINSANY $auth.parents OR person.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
+DEFINE TABLE OVERWRITE v_group_esg_ctx AS 
+    SELECT 
+        a_from.owned_by AS group, 
+        a_status AS status, 
+        a_category AS category, 
+        math::sum(d2_xp_earned) AS xp_earned, 
+        math::sum(d3_xp_spent) AS xp_spent, 
+        math::sum(d4_net_xp) AS net_xp, 
+        math::sum(d5_co2e) AS co2e 
+    FROM esg_tx 
+    GROUP BY group, status, category;
 
-DEFINE TABLE OVERWRITE v_oppl_person AS SELECT a_opportunity.a_person AS person, math::sum(d2_net_base) AS total_pipeline_val FROM opportunity_line GROUP BY person
-    PERMISSIONS FOR select WHERE ('opportunity_line_select' IN $auth.permissions AND (person.readers CONTAINSANY $auth.parents OR person.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
-
--- ==============================================================================
--- 7. BI & TIME-SERIES (Read-Only Analytics)
--- ==============================================================================
--- These views use time::group(). They will NOT trigger upward pings (ignored by 
--- the ReBase compiler for validation) but provide instant O(1) dashboard charts.
-
--- Daily global revenue and item count
-DEFINE TABLE OVERWRITE v_bi_orderl_daily AS SELECT time::group(a_order.a_order_date, 'day') AS day, math::sum(d2_net_base) AS daily_revenue, math::sum(a_qty) AS items_sold FROM order_line GROUP BY day
-    PERMISSIONS FOR select WHERE 'order_line_select' IN $auth.permissions
-    FOR create, update, delete NONE;
-
--- Monthly organizational revenue velocity
-DEFINE TABLE OVERWRITE v_bi_orderl_org_monthly AS SELECT time::group(a_order.a_order_date, 'month') AS month, a_order.a_organization AS org, math::sum(d2_net_base) AS monthly_revenue FROM order_line GROUP BY month, org
-    PERMISSIONS FOR select WHERE ('order_line_select' IN $auth.permissions AND (org.readers CONTAINSANY $auth.parents OR org.readers CONTAINSANY $auth.dominates))
-    FOR create, update, delete NONE;
-
--- Monthly pipeline generation
-DEFINE TABLE OVERWRITE v_bi_opp_created_monthly AS SELECT time::group(created_at, 'month') AS month, count() AS new_opportunities FROM opportunity GROUP BY month
-    PERMISSIONS FOR select WHERE 'opportunity_select' IN $auth.permissions
-    FOR create, update, delete NONE;
+DEFINE TABLE OVERWRITE v_group_wallet AS 
+    SELECT 
+        a_from.owned_by AS group, 
+        math::sum(d4_net_xp) AS total_balance, 
+        math::sum(d5_co2e) AS total_co2e 
+    FROM esg_tx 
+    WHERE a_status = 'Approved' 
+    GROUP BY group;

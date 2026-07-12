@@ -1,207 +1,130 @@
 USE NS main DB main;
 
-DEFINE EVENT aot_cascade_downward ON TABLE lifecycle_status WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE category WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~organization;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~badge;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-    };
-};
-
-DEFINE EVENT aot_cascade_downward ON TABLE organization WHEN $event = 'UPDATE' THEN {
-    IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~person;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~reward;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~challenge;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~csr_activity;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~esg_policy;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~audit;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-    };
-};
-
-DEFINE EVENT aot_cascade_downward ON TABLE unit WHEN $event = 'UPDATE' THEN {
-    IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
             LET $tgt = $after<~product;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
-    };
-};
-
-DEFINE EVENT aot_cascade_downward ON TABLE campaign_type WHEN $event = 'UPDATE' THEN {
-    IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~campaign;
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~emission_factor;
+            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
+        };
+        IF $before.a_target_table != $after.a_target_table {
+            LET $tgt = $after<~product_esg_profile;
+            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
+        };
+        IF $before.a_target_table != $after.a_target_table OR $before.owned_by != $after.owned_by {
+            LET $tgt = $after<~environmental_goal;
+            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
+        };
+        IF $before.a_target_table != $after.a_target_table {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE pipeline WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE product WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
         IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~stage;
+            LET $tgt = $after<~product_esg_profile;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE stage WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE product_esg_profile WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.a_pipeline != $after.a_pipeline {
-            LET $tgt = $after<~opportunity;
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE person WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE reward WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~opportunity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE opportunity WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE challenge WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~quote;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.a_organization != $after.a_organization {
-            LET $tgt = $after<~quote<~order;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.a_organization != $after.a_organization OR $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~order;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~opportunity_line;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE quote WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE csr_activity WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.a_organization != $after.a_organization OR $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~order;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~quote_line;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE order WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE esg_policy WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~order_line;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };
 };
 
-DEFINE EVENT aot_cascade_downward ON TABLE campaign WHEN $event = 'UPDATE' THEN {
+DEFINE EVENT aot_cascade_downward ON TABLE audit WHEN $event = 'UPDATE' THEN {
+    IF $__rebase_halt_cascade != true {
+        IF $before.a_xp_reward != $after.a_xp_reward OR $before.a_xp_cost != $after.a_xp_cost OR $before.a_xp_penalty_per_unit != $after.a_xp_penalty_per_unit {
+            LET $tgt = $after<~esg_tx;
+            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
+        };
+    };
+};
+
+DEFINE EVENT aot_cascade_downward ON TABLE emission_factor WHEN $event = 'UPDATE' THEN {
+    IF $__rebase_halt_cascade != true {
+        IF $before.a_co2e_per_unit != $after.a_co2e_per_unit {
+            LET $tgt = $after<~product_esg_profile<~esg_tx;
+            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
+        };
+    };
+};
+
+DEFINE EVENT aot_cascade_downward ON TABLE user WHEN $event = 'UPDATE' THEN {
     IF $__rebase_halt_cascade != true {
         IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~task;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~activity;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~note;
-            IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
-        };
-        IF $before.owned_by != $after.owned_by {
-            LET $tgt = $after<~attachment;
+            LET $tgt = $after<~esg_tx;
             IF $tgt { UPDATE $tgt SET system_ping = time::now(); };
         };
     };

@@ -17,7 +17,7 @@ async function runCompiler() {
     "========================================================================\n",
   );
 
-  const project_dir = "designs/crm/";
+  const project_dir = "designs/esg/";
   const file06 = fs.existsSync(project_dir + "06_table_fields.surql")
     ? fs.readFileSync(project_dir + "06_table_fields.surql", "utf8")
     : "";
