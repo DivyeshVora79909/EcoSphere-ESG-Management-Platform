@@ -297,5 +297,3 @@ CREATE user:root SET name = 'Super Admin', email = 'divy.r.vora14@gmail.com';
 UPDATE user:root SET password = crypto::argon2::generate("password"), invite_token = NONE;
 RELATE groups:root -> link -> user:root;
 UPDATE user:root SET last_refreshed_at = time::now();
-
-Error while processing event user_on_create: Couldn't coerce value for field `total_deactivations` of `user:9pei8qqolc496hhvphdg`: Expected `int` but found `NONE`
